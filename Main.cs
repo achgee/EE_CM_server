@@ -32,7 +32,11 @@ namespace EE_CM
 	enum C
 	{
 		// Must always be higher than the highest block ID, by 1
+#if INDEV
+		BLOCK_MAX = 65536,
+#else
 		BLOCK_MAX = 1041,
+#endif
 		BLOCK_TYPES = 5,
 		WORLD_TYPES = 5,
 		WORLDS_PER_PLAYER = 4,
@@ -55,11 +59,11 @@ namespace EE_CM
 #if INDEV
 	[RoomType("Indev")]
 #else
-	[RoomType("Game39")]
+	[RoomType("Game40")]
 #endif
 	public class EENGameCode : Game<Player>
 	{
-		#region Definition of block arrays and world data
+#region Definition of block arrays and world data
 		Bindex[,] blocks;
 		Block[,] Nblock;
 		Block[, ,] PBlock;
@@ -110,7 +114,7 @@ namespace EE_CM
 			say_normal = "abcdefghijklmnopqurstuvwxyz ";
 
 		byte[] keys = new byte[3];
-		#endregion
+#endregion
 
 		public override void GameStarted()
 		{
@@ -396,7 +400,7 @@ namespace EE_CM
 
 		void MainGameFunc(Player pl, Message m)
 		{
-			#region Init
+#region Init
 			if ((m.Type == "init" || m.Type == "botinit") &&
 				!pl.isInited &&
 				!pl.send_init) {
@@ -424,7 +428,7 @@ namespace EE_CM
 				}
 				return;
 			}
-			#endregion
+#endregion
 
 			if (m.Type == "access") {
 				if (!(m[0] is string) || !pl.isInited) {
@@ -446,9 +450,9 @@ namespace EE_CM
 
 		void HandleBlock(Player pl, Message m)
 		{
-			#region Block placement
+#region Block placement
 			if (m.Type == W_rot13) {
-				#region Verify block data
+#region Verify block data
 				if (isEditBlocked || m.Count < 4 || !pl.canEdit)
 					return;
 
@@ -465,9 +469,9 @@ namespace EE_CM
 					return;
 
 				Bindex bl = new Bindex(blocks[x, y]);
-				#endregion
+#endregion
 
-				#region Get block info
+#region Get block info
 				if (pl.getBlockInfo) {
 					string text = "Id: " + (l == 0 ? bl.FG : bl.BG),
 						blPlacer = "?";
@@ -501,13 +505,13 @@ namespace EE_CM
 					pl.getBlockInfo = false;
 					return;
 				}
-				#endregion
+#endregion
 
 				Message block_msg = null;
 				if (getBlockArgCount(b) == 0) {
 					if (b == (l == 0 ? bl.FG : bl.BG) || m.Count != 4) return;
 
-					#region normalBlock
+#region normalBlock
 					if (l == 0 && b < (int)C.BLOCK_MAX) {
 #if INDEV
 						removeOldBlock(x, y, bl.FG, bl.arg3);
@@ -521,10 +525,10 @@ namespace EE_CM
 						bl.FG = b;
 						bl.FGp = pl.Id;
 						bl.arg3 = 0;
-						bl.pId = 0;
-						bl.pTarget = 0;
+						bl.arg4 = 0;
+						bl.arg5 = 0;
 #else
-						#region foreground
+#region foreground
 						bool edit = false;
 						if (b >= 0 && b <= 36) edit = true;		// Default (some by Krock)
 						if (b >= 37 && b <= 42) edit = true;	// Beta (by Krock)
@@ -631,7 +635,8 @@ namespace EE_CM
 						if (b >= 300 && b <= 305) edit = true;  // Alien (by Weirdo)
 						if (b >= 306 && b <= 310) edit = true;  // Cave (by Weirdo)
 						if (b >= 311 && b <= 313) edit = true;  // Dungeon (by dcomet)
-						if (b >= 314 && b <= 320) edit = true;	// Urban (by dcomet)
+						if (b >= 314 && b <= 320) edit = true;  // Urban (by dcomet)
+						if (b == 321) edit = true;				// Extra Glass (by HG)
 
 						if (!edit)
 							return;
@@ -649,7 +654,7 @@ namespace EE_CM
 						bl.arg3 = 0;
 						bl.arg4 = 0;
 						bl.arg5 = 0;
-						#endregion
+#endregion
 #endif
 					} else if (l == 1 && ((b >= 500 && b - 500 < (int)C.BLOCK_MAX) || b == 0)) {
 #if INDEV
@@ -666,7 +671,7 @@ namespace EE_CM
 						bl.BG = b;
 						bl.BGp = pl.Id;
 #else
-						#region background
+#region background
 						bool edit = false;
 						if (b == 0) edit = true;
 						if (b >= 500 && b <= 512) edit = true;	// Basic (by Krock)
@@ -691,7 +696,8 @@ namespace EE_CM
 						if (b == 600) edit = true;              // Black (by HG)
 						if (b >= 601 && b <= 608) edit = true;  // Stripped (by Ravatroll)
 						if (b == 609) edit = true;              // Dungeon (by dcomet)
-						if (b >= 610 && b <= 617) edit = true;	// Urban (by dcomet)
+						if (b >= 610 && b <= 617) edit = true;  // Urban (by dcomet)
+						if (b >= 618 && b <= 622) edit = true;	// Future (by HG)
 
 						if (!edit) return;
 
@@ -708,13 +714,13 @@ namespace EE_CM
 						}
 						bl.BG = b;
 						bl.BGp = pl.Id;
-						#endregion
+#endregion
 #endif
 					} else return;
 					block_msg = Message.Create("b", l, x, y, b);
-					#endregion
+#endregion
 				} else if (b == 1000) {
-					#region Text
+#region Text
 					if (b == bl.FG || m.Count != 5 || l != 0)
 						return;
 					if (!pl.isModerator && !pl.isAdmin && !W_allowText)
@@ -727,7 +733,7 @@ namespace EE_CM
 					if (text.Length > 150)
 						text = text.Remove(150);
 
-					#region Set modText string
+#region Set modText string
 					int arg3 = -2,
 						free = -2;
 
@@ -757,7 +763,7 @@ namespace EE_CM
 							arg3 = free;
 						}
 					}
-					#endregion
+#endregion
 
 					if (isLimit) {
 						if (pl.system_messages < sys_msg_max) {
@@ -780,9 +786,9 @@ namespace EE_CM
 					bl.arg5 = 0;
 
 					block_msg = Message.Create("lb", x, y, b, text);
-					#endregion
+#endregion
 				} else if (b == 43 || b == 77 /*|| b == 83*/) {
-					#region Coin doors, Music blocks
+#region Coin doors, Music blocks
 					if (m.Count != 5 || l != 0)
 						return;
 
@@ -805,9 +811,9 @@ namespace EE_CM
 					bl.arg3 = (byte)arg3;
 
 					block_msg = Message.Create((b == 43) ? "bc" : "bs", x, y, b, arg3);
-					#endregion
+#endregion
 				} else if (b == 242 && (pl.isAdmin || pl.isModerator)) {
-					#region Portals
+#region Portals
 					if (m.Count != 7 || l != 0)
 						return;
 
@@ -839,7 +845,7 @@ namespace EE_CM
 					bl.arg5 = (byte)pTarget;
 
 					block_msg = Message.Create("pt", x, y, b, rotation, pId, pTarget);
-					#endregion
+#endregion
 				}
 
 				if (block_msg == null)
@@ -856,9 +862,9 @@ namespace EE_CM
 				}
 				return;
 			}
-			#endregion
+#endregion
 
-			#region cb - Codeblock
+#region cb - Codeblock
 			if (m.Type == "cb" && !pl.isBot) {
 				if (!pl.canEdit && pl.moved > 0 && !pl.god_mode && !pl.mod_mode) {
 					if (getBlock(0, m.GetInt(0), m.GetInt(1)) == 103) {
@@ -868,9 +874,9 @@ namespace EE_CM
 				}
 				return;
 			}
-			#endregion
+#endregion
 
-			#region cp - Checkpoint
+#region cp - Checkpoint
 			if (m.Type == "cp" && !pl.isBot) {
 				int x = m.GetInt(0),
 					y = m.GetInt(1);
@@ -882,7 +888,7 @@ namespace EE_CM
 				}
 				return;
 			}
-			#endregion
+#endregion
 
 			if (m.Type == "th" && !pl.isBot) {
 				if (!pl.god_mode && !pl.mod_mode && !pl.isDead && !kill_active) {
@@ -890,7 +896,7 @@ namespace EE_CM
 				}
 				return;
 			}
-			#region complete - Trophy
+#region complete - Trophy
 			if (m.Type == "complete") {
 				if (!pl.god_mode && !pl.mod_mode && !pl.levelComplete) {
 					if (getBlock(0, m.GetInt(0), m.GetInt(1)) == 106) {
@@ -901,9 +907,9 @@ namespace EE_CM
 				}
 				return;
 			}
-			#endregion
+#endregion
 
-			#region rcoins - Reset player's coins
+#region rcoins - Reset player's coins
 			if (m.Type == "rcoins") {
 				pl.coins = 0;
 				pl.cPointX = -1;
@@ -915,7 +921,7 @@ namespace EE_CM
 				Broadcast("tele", true, pl.Id, pl.posX, pl.posY);
 				return;
 			}
-			#endregion
+#endregion
 
 			if (m.Type == "diamondtouch") {
 				if (m.Count >= 2 && !pl.god_mode && !pl.mod_mode && pl.Face != 31) {
@@ -949,7 +955,7 @@ namespace EE_CM
 				return;
 			}
 
-			#region Change face
+#region Change face
 			if (m.Type == (W_rot13 + "f")) {
 				if (pl.firstFace) {
 					pl.firstFace = false;
@@ -971,7 +977,7 @@ namespace EE_CM
 				}
 				return;
 			}
-			#endregion
+#endregion
 
 			if (m.Type == (W_rot13 + "k")) {
 				if (!pl.god_mode && !pl.mod_mode && !pl.isDead) {
@@ -981,7 +987,7 @@ namespace EE_CM
 				return;
 			}
 
-			#region c - Coin
+#region c - Coin
 			if (m.Type == "c") {
 				if (W_isLoading || m.Count != 3) return;
 				if (getBlock(0, m.GetInt(1), m.GetInt(2)) != 100) {
@@ -996,9 +1002,9 @@ namespace EE_CM
 				pl.gotCoin = true;
 				return;
 			}
-			#endregion
+#endregion
 
-			#region Keys
+#region Keys
 			for (byte i = 0; i < key_colors.Length; i++) {
 				if (m.Type == W_rot13 + key_colors[i][0]) {
 					if (keys[i] == 0) {
@@ -1009,12 +1015,12 @@ namespace EE_CM
 					}
 				}
 			}
-			#endregion
+#endregion
 		}
 
 		void OwnerInteract(Player pl, Message m)
 		{
-			#region key - Change key
+#region key - Change key
 			if (m.Type == "key") {
 				W_key = m.GetString(0);
 				Broadcast("lostaccess");
@@ -1031,9 +1037,9 @@ namespace EE_CM
 				RoomData.Save();
 				return;
 			}
-			#endregion
+#endregion
 
-			#region name - Change title
+#region name - Change title
 			if (m.Type == "name") {
 				W_title = m.GetString(0);
 				if (W_title.Length > 60) {
@@ -1045,7 +1051,7 @@ namespace EE_CM
 				RoomData.Save();
 				return;
 			}
-			#endregion
+#endregion
 
 			if (m.Type == "clear" && !W_isLoading) {
 				broadcast_clear_world();
@@ -1058,6 +1064,9 @@ namespace EE_CM
 					W_can_save = false;
 					addLog(pl.Name, "Saved world");
 					save_worlddata(pl);
+				} else if (!W_gotEdited) {
+					pl.Send("write", SYS, "There are no changes to be saved.");
+					pl.Send("saved");
 				}
 				// Prevent from mass-save
 				W_gotEdited = false;
@@ -1072,7 +1081,7 @@ namespace EE_CM
 				if (msg.Length == 0) return;
 
 				if (msg[0] == '/') {
-					#region header
+#region header
 					string[] args = msg.Split(' ');
 					int length = 0;
 
@@ -1089,9 +1098,9 @@ namespace EE_CM
 
 					for (int i = length; i < args.Length; i++)
 						args[i] = "";
-					#endregion
+#endregion
 
-					#region /commands
+#region /commands
 					if (args[0] == "/reset") {
 						if (!hasAccess(pl, Rights.Admin)) return;
 						if (!W_isLoading) {
@@ -1124,10 +1133,10 @@ namespace EE_CM
 						return;
 					}
 
-					#region resize
+#region resize
 					if (args[0] == "/resize_this_world" && length == 1 && !W_isOpen) {
 						if (!hasAccess(pl, Rights.Owner)) return;
-						#region resize1
+#region resize1
 						PlayerIO.BigDB.Load("Worlds", RoomId, delegate(DatabaseObject w_obj) {
 							PlayerIO.BigDB.Load("PlayerObjects", w_obj.GetString("owner"), delegate(DatabaseObject o) {
 								string[] types = o.GetString("roomType").Split(','),
@@ -1161,11 +1170,11 @@ namespace EE_CM
 							});
 						});
 						return;
-						#endregion
+#endregion
 					}
 					if (args[0] == "/resize_this_world" && length > 1) {
 						if (!hasAccess(pl, Rights.Owner)) return;
-						#region resize2
+#region resize2
 						if (W_type < 0) {
 							pl.Send("write", "* RESIZER", "Say '" + args[0] + "' to see what changes.");
 							return;
@@ -1189,13 +1198,13 @@ namespace EE_CM
 							w_obj.Save();
 							save_worlddata(pl, true);
 						});
-						#endregion
+#endregion
 						return;
 					}
-					#endregion
+#endregion
 					if (args[0] == "/kick") {
 						if (!hasAccess(pl, Rights.Vigilant, length > 1)) return;
-						#region kick
+#region kick
 						args[1] = args[1].ToLower();
 						bool found = false;
 						string content = "Tsk. Tsk.";
@@ -1219,12 +1228,12 @@ namespace EE_CM
 						if (found) {
 							Broadcast("write", SYS, pl.Name.ToUpper() + " kicked " + args[1].ToUpper() + ": " + content);
 						} else pl.Send("write", SYS, "Unknown username or player is the owner or a moderator");
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/giveedit") {
 						if (!hasAccess(pl, Rights.Admin, length >= 2)) return;
-						#region giveedit
+#region giveedit
 						bool found = false;
 						args[1] = args[1].ToLower();
 						foreach (Player p in Players) {
@@ -1241,12 +1250,12 @@ namespace EE_CM
 							addLog(pl.Name, "[+] edit: " + args[1].ToUpper());
 							pl.Send("write", SYS, args[1].ToUpper() + " can now edit this world");
 						} else pl.Send("write", SYS, "Unknown username or player already has edit");
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/removeedit") {
 						if (!hasAccess(pl, Rights.Admin, length > 1)) return;
-						#region removeedit
+#region removeedit
 						args[1] = args[1].ToLower();
 						bool found = false;
 						foreach (Player p in Players) {
@@ -1265,12 +1274,12 @@ namespace EE_CM
 							addLog(pl.Name, "[-] edit: " + args[1].ToUpper());
 							pl.Send("write", SYS, args[1].ToUpper() + " can no longer edit this world");
 						} else pl.Send("write", SYS, "Unknown username, player is owner or does not have edit.");
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/kill") {
 						if (!hasAccess(pl, Rights.Admin, length > 1)) return;
-						#region kill player
+#region kill player
 						bool found = false;
 						args[1] = args[1].ToLower();
 						foreach (Player p in Players) {
@@ -1282,12 +1291,12 @@ namespace EE_CM
 							}
 						}
 						if (!found) pl.Send("write", SYS, "Unknown username or player is god/mod");
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/ban") {
 						if (!hasAccess(pl, Rights.Vigilant, length > 1)) return;
-						#region banning
+#region banning
 						string player_name = args[1].ToLower();
 						bool found = false,
 							isGuest = false;
@@ -1316,7 +1325,7 @@ namespace EE_CM
 						} else {
 							pl.Send("write", SYS, "Unknown username, player is owner or moderator");
 						}
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/cmban") {
@@ -1325,7 +1334,7 @@ namespace EE_CM
 							pl.Send("write", SYS, "Please use " + args[0] + " <player> <hours>");
 							return;
 						}
-						#region banning from EE CM
+#region banning from EE CM
 						string player_name = args[1].ToLower();
 						bool found = false;
 
@@ -1362,23 +1371,23 @@ namespace EE_CM
 						} else {
 							pl.Send("write", SYS, "Unknown username, player is owner, vigilant or moderator");
 						}
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/unban") {
 						if (!hasAccess(pl, Rights.Vigilant, length > 1)) return;
-						#region unbanning
+#region unbanning
 						args[1] = args[1].ToLower();
 						if (banned.Contains(args[1])) {
 							banned.Remove(args[1]);
 							Broadcast("write", SYS, pl.Name + " unbanned " + args[1]);
 						} else pl.Send("write", SYS, "This player is not banned.");
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/list") {
 						if (!hasAccess(pl, Rights.Normal, length > 1)) return;
-						#region list
+#region list
 						args[1] = args[1].ToLower();
 						string list = "";
 						if (args[1] == "ban" || args[1] == "bans") {
@@ -1401,12 +1410,12 @@ namespace EE_CM
 							}
 							pl.Send("write", SYS, "All players on your mute list: " + list);
 						} else pl.Send("write", SYS, "Unknown argument. Use either ban(s), admin(s) or mute(s).");
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/addadmin") {
 						if (!hasAccess(pl, Rights.Owner, length > 1)) return;
-						#region addadmin
+#region addadmin
 						bool found = false;
 						args[1] = args[1].ToLower();
 						if (admins.Contains(args[1]) ||
@@ -1434,12 +1443,12 @@ namespace EE_CM
 								}
 							});
 						}
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/rmadmin") {
 						if (!hasAccess(pl, Rights.Owner, length > 1)) return;
-						#region rmadmin
+#region rmadmin
 						args[1] = args[1].ToLower();
 
 						if (admins.Contains(args[1])) {
@@ -1454,7 +1463,7 @@ namespace EE_CM
 						} else {
 							pl.Send("write", SYS, "Unknown username or player is not an admin");
 						}
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/teleport" || args[0] == "/tp") {
@@ -1463,7 +1472,7 @@ namespace EE_CM
 							pl.Send("write", SYS, "You can not teleport in an open world.");
 							return;
 						}
-						#region stalking
+#region stalking
 						string src = pl.Name,
 							dst = "";
 						int x = 0,
@@ -1522,7 +1531,7 @@ namespace EE_CM
 						if (!found) {
 							pl.Send("write", SYS, "Could not find player '" + src.ToUpper() + "'");
 						}
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/loadlevel" || args[0] == "/load") {
@@ -1542,7 +1551,7 @@ namespace EE_CM
 						pl.Send("write", SYS, "Now, click on the block from which you want the information about.");
 						return;
 					}
-					#region modpower
+#region modpower
 					if (args[0] == "/info") {
 						if (!hasAccess(pl, Rights.Moderator, length > 2)) return;
 						string content = "";
@@ -1554,7 +1563,7 @@ namespace EE_CM
 					}
 					if (args[0] == "/write") {
 						if (!hasAccess(pl, Rights.Moderator, length > 2)) return;
-						#region modwrite
+#region modwrite
 						args[1] = args[1].ToLower();
 						string content = "";
 						for (int i = 2; i < length; i++) {
@@ -1568,7 +1577,7 @@ namespace EE_CM
 							}
 						}
 						Broadcast("write", args[1], content);
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/code") {
@@ -1578,18 +1587,18 @@ namespace EE_CM
 					}
 					if (args[0] == "/name") {
 						if (!hasAccess(pl, Rights.Admin, length > 1)) return;
-						#region name
+#region name
 						string content = "";
 						for (int i = 1; i < length; i++) {
 							content += args[i] + " ";
 						}
 						OwnerInteract(pl, Message.Create("name", content));
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/getip") {
 						if (!hasAccess(pl, Rights.Moderator, length > 1)) return;
-						#region getIP
+#region getIP
 						bool found = false;
 						args[1] = args[1].ToLower();
 						foreach (Player p in Players) {
@@ -1600,12 +1609,12 @@ namespace EE_CM
 							}
 						}
 						if (!found) pl.Send("write", SYS, "Unknown username");
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/eliminate") {
 						if (!hasAccess(pl, Rights.Moderator, length > 1)) return;
-						#region kick player
+#region kick player
 						args[1] = args[1].ToLower();
 						bool found = false;
 						foreach (Player p in Players) {
@@ -1617,10 +1626,10 @@ namespace EE_CM
 						if (!found) {
 							pl.Send("write", SYS, "Unknown username");
 						}
-						#endregion
+#endregion
 						return;
 					}
-					#endregion
+#endregion
 					if (args[0] == "/killroom") {
 						if (!hasAccess(pl, Rights.Owner)) return;
 						Broadcast("info", "World Killed", "This world has been killed by " + (pl.isAdmin ? "the owner" : " a moderator"));
@@ -1633,7 +1642,7 @@ namespace EE_CM
 						return;
 					}
 					if (args[0] == "/respawn") {
-						#region Respawn player
+#region Respawn player
 						if (!W_canRespawn && get_rights(pl) < Rights.Admin) {
 							pl.Send("write", SYS, "The respawn privilege is deactivated. You can not respawn.");
 							return;
@@ -1664,7 +1673,7 @@ namespace EE_CM
 
 						if (!found)
 							pl.Send("write", SYS, "Unknown username or the player is in god/mod mode.");
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/upgrade") {
@@ -1683,7 +1692,7 @@ namespace EE_CM
 
 					if (args[0] == "/me") {
 						if (!hasAccess(pl, Rights.Normal, length > 1)) return;
-						#region action
+#region action
 						string content = "";
 						for (int i = 1; i < length; i++) {
 							content += args[i] + " ";
@@ -1705,7 +1714,7 @@ namespace EE_CM
 						}
 
 						Broadcast("write", "* WORLD", pl.Name.ToUpper() + " " + content);
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/away" || args[0] == "/afk")
@@ -1717,7 +1726,7 @@ namespace EE_CM
 
 					if (args[0] == "/pm") {
 						if (!hasAccess(pl, Rights.Normal, length > 2)) return;
-						#region pm
+#region pm
 						args[1] = args[1].ToLower();
 						bool found = false;
 						string content = "";
@@ -1752,12 +1761,12 @@ namespace EE_CM
 							pl.Send("write", "*TO " + args[1].ToUpper(), content);
 						else
 							pl.Send("write", SYS, "Unknown username");
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/mute") {
 						if (!hasAccess(pl, Rights.Normal, length > 1)) return;
-						#region mute
+#region mute
 						string name = args[1].ToLower();
 						if (pl.muted.Contains(name)) {
 							pl.Send("write", SYS, "This player is already muted.");
@@ -1776,12 +1785,12 @@ namespace EE_CM
 						} else {
 							pl.Send("write", SYS, "Unknown username");
 						}
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/unmute") {
 						if (!hasAccess(pl, Rights.Normal, length > 1)) return;
-						#region unmute
+#region unmute
 						args[1] = args[1].ToLower();
 						if (!pl.muted.Contains(args[1])) {
 							pl.Send("write", SYS, "This player is not muted.");
@@ -1789,7 +1798,7 @@ namespace EE_CM
 						}
 						pl.muted.Remove(args[1]);
 						pl.Send("write", SYS, "The messages from " + args[1].ToUpper() + " will be visible for you again.");
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/woot") {
@@ -1825,7 +1834,7 @@ namespace EE_CM
 					if (args[0] == "/set") {
 						if (!hasAccess(pl, Rights.Admin, length > 2))
 							return;
-						#region Change a boolean world setting
+#region Change a boolean world setting
 
 						if (args[1].ToLower() == "help") {
 							string ret = "Unknown setting `" + args[2].ToLower() + "´. See `help all´";
@@ -1870,10 +1879,10 @@ namespace EE_CM
 							break;
 						}
 						return;
-						#endregion;
+#endregion;
 					}
 					if (args[0] == "/help" && length == 1) {
-						#region Output this huge commands list
+#region Output this huge commands list
 						Rights level = get_rights(pl);
 						string lMgr = "Level Managing: /getblockinfo, /gbi" + (W_isSaved ? ", /list admins" : ""),
 							pSpec = "\n\nPlayer specific: /respawn, /woot, /rankof [name], /mute [name], /unmute [name], /list mutes",
@@ -1896,11 +1905,11 @@ namespace EE_CM
 							cTool += ", /write [name] [text], /info [title] [text]";
 						}
 						pl.Send("write", SYS, lMgr + pSpec + cTool + "\n\nSee /help [command] for further information.");
-						#endregion
+#endregion
 						return;
 					}
 					if (args[0] == "/help" && length > 1) {
-						#region detailed help
+#region detailed help
 						string cmd = args[1].ToLower();
 						if (cmd.StartsWith("/"))
 							cmd = cmd.Remove(0, 1);
@@ -2012,17 +2021,17 @@ namespace EE_CM
 							break;
 						}
 						pl.Send("write", SYS, ret);
-						#endregion
+#endregion
 						return;
 					}
 					pl.Send("write", SYS, "Unknown command. See /help for all commands.");
-					#endregion
+#endregion
 					return;
 				}
 				if (pl.isGuest)
 					return;
 
-				#region Spamfilter
+#region Spamfilter
 				if (msg.Length > W_chatLimit)
 					msg = msg.Remove(W_chatLimit, msg.Length - W_chatLimit);
 
@@ -2060,11 +2069,11 @@ namespace EE_CM
 					if (!p.isGuest && !p.muted.Contains(pl.Name))
 						p.Send("say", pl.Id, msg);
 				}
-				#endregion
+#endregion
 				return;
 			}
 			if (m.Type == "m") {
-				#region Movements
+#region Movements
 				if (m.Count < 8) {
 					pl.Disconnect();
 					return;
@@ -2116,7 +2125,7 @@ namespace EE_CM
 				bool skip_send = false,
 					has_gravity = !pl.god_mode && !pl.mod_mode && !pl.isAdmin;
 
-				#region anti-cheat
+#region anti-cheat
 				if (has_gravity) {
 					bool valid = false;
 					for (sbyte mY = -1; mY <= 1; mY++) {
@@ -2191,8 +2200,8 @@ namespace EE_CM
 					if (!isBoost)
 						pl.mWarns += 8;
 				}
-				#endregion
-				#endregion
+#endregion
+#endregion
 			}
 		}
 
@@ -2248,7 +2257,7 @@ namespace EE_CM
 			}
 		}
 
-		#region Database save and load functions
+#region Database save and load functions
 		ushort[] DB_FLAGS = new ushort[] {
 			1 << 15, // X
 			1 << 14, // Y
@@ -2261,14 +2270,14 @@ namespace EE_CM
 
 		byte[] serializeData()
 		{
-			#region Define variables
+#region Define variables
 			MemoryStream stream = new MemoryStream();
 			BinaryWriter writer = new BinaryWriter(stream);
 			writer.Write(0xC0FFEE03);
 
 			SaveEntry last = new SaveEntry(),
 				cur = new SaveEntry();
-			#endregion
+#endregion
 			writer.Write((ushort)W_width);
 
 			for (; cur.y < W_height; cur.y++) {
@@ -2334,7 +2343,7 @@ namespace EE_CM
 			}
 			writer.Write((ushort)0xDEAD);
 
-			#region Portals
+#region Portals
 			for (int y = 0; y < W_height; y++) {
 				for (int x = 0; x < W_width; x++) {
 					if (blocks[x, y].FG != 242)
@@ -2344,8 +2353,8 @@ namespace EE_CM
 					writer.Write(blocks[x, y].arg5);
 				}
 			}
-			#endregion
-			#region Texts
+#endregion
+#region Texts
 			if (modText != null) {
 				writer.Write((ushort)0xDEAD);
 
@@ -2377,7 +2386,7 @@ namespace EE_CM
 					writer.Write(enc.GetBytes(modText[i]));
 				}
 			}
-			#endregion
+#endregion
 
 			writer.Close();
 			stream.Close();
@@ -2421,7 +2430,7 @@ namespace EE_CM
 
 		void deserializeData(byte[] data)
 		{
-			#region Define variables
+#region Define variables
 			MemoryStream stream = new MemoryStream(data);
 			BinaryReader reader = new BinaryReader(stream);
 
@@ -2440,7 +2449,7 @@ namespace EE_CM
 
 			for (int i = 0; i < DB_FLAGS.Length; i++)
 				DB_FLAGS_MASK |= DB_FLAGS[i];
-			#endregion
+#endregion
 
 			bool first = true;
 			while (cur.y < W_height) {
@@ -2501,7 +2510,7 @@ namespace EE_CM
 				// Push tail to new head
 				cur = new SaveEntry(next);
 			}
-			#region Portals
+#region Portals
 			for (int y = 0; y < W_height; y++) {
 				for (int x = 0; x < t_width; x++) {
 					if (blocks[x, y].FG != 242)
@@ -2517,8 +2526,8 @@ namespace EE_CM
 					blocks[x, y] = b;
 				}
 			}
-			#endregion
-			#region Texts
+#endregion
+#region Texts
 			if (stream.Position + 2 < stream.Length) {
 				ushort security = reader.ReadUInt16();
 
@@ -2532,7 +2541,7 @@ namespace EE_CM
 					}
 				}
 			}
-			#endregion
+#endregion
 
 			reader.Close();
 			stream.Close();
@@ -2543,7 +2552,7 @@ namespace EE_CM
 			DatabaseArray ar = new DatabaseArray();
 			int index = 0;
 
-			#region Fore-/background and special blocks
+#region Fore-/background and special blocks
 			for (int l = 0; l < (int)C.BLOCK_TYPES; l++) {
 				for (int b = 0; b < (int)C.BLOCK_MAX; b++) {
 					if (l == 0 && b == 0)
@@ -2606,9 +2615,9 @@ namespace EE_CM
 					index++;
 				}
 			}
-			#endregion
+#endregion
 
-			#region Portals
+#region Portals
 			for (int r = 0; r < PBlock.GetLength(0); r++)
 				for (int g = 0; g < 100; g++)
 					for (int p = 0; p < 100; p++) {
@@ -2649,7 +2658,7 @@ namespace EE_CM
 						ar.Set(index, ob);
 						index++;
 					}
-			#endregion
+#endregion
 
 			o.Set("worlddata", ar);
 		}
@@ -2665,7 +2674,7 @@ namespace EE_CM
 					continue;
 
 				DatabaseObject ob = ar.GetObject(i);
-				#region Header
+#region Header
 				int l = ob.GetInt("layer");
 				int b = ob.GetInt("type");
 				int arg3 = -2, pId = -2, pTg = -2;
@@ -2680,7 +2689,7 @@ namespace EE_CM
 					pTg = ob.GetInt("pt");
 					isPortal = true;
 				}
-				#endregion
+#endregion
 
 				byte[] pX = ob.GetBytes("x"),
 					pY = ob.GetBytes("y");
@@ -2741,7 +2750,7 @@ namespace EE_CM
 
 #if INDEV
 		void save_worlddata(Player pl, bool kick_all = false) {
-			pl.Send("write", "* ERROR", "You can not save a world in the indev mode.";
+			pl.Send("write", "* ERROR", "You can not save a world in the indev mode.");
 			pl.Send("saved");
 		}
 #else
@@ -2755,7 +2764,7 @@ namespace EE_CM
 				if (kick_all)
 					W_isSaved = false;
 
-				#region Texts
+#region Texts
 				DatabaseArray txt = new DatabaseArray();
 				for (int i = 0; i < modText.Length; i++) {
 					if (!string.IsNullOrEmpty(modText[i]))
@@ -2766,7 +2775,7 @@ namespace EE_CM
 					o.Remove("text");
 				if (txt.Count > 0 && !W_experimental_saving)
 					o.Set("text", txt);
-				#endregion
+#endregion
 
 				if (W_experimental_saving) {
 					if (o.Contains("worlddata"))
@@ -2801,7 +2810,7 @@ namespace EE_CM
 		{
 			W_isLoading = true;
 			PlayerIO.BigDB.Load("Worlds", RoomId, delegate(DatabaseObject o) {
-				#region Verify database object
+#region Verify database object
 				bool canLoad = false;
 				if (o != null) {
 					if (o.ExistsInDatabase) {
@@ -2813,9 +2822,9 @@ namespace EE_CM
 					clear_world(false);
 					return;
 				}
-				#endregion
+#endregion
 
-				#region Load on-init values
+#region Load on-init values
 				if (init) {
 					if (o.Contains("name"))
 						W_title = o.GetString("name");
@@ -2841,11 +2850,11 @@ namespace EE_CM
 						RoomData.Save();
 					});
 				}
-				#endregion
+#endregion
 
 				clear_world(false, false);
 
-				#region Get texts
+#region Get texts
 				DatabaseArray texts = new DatabaseArray();
 				if (o.Contains("text"))
 					texts = o.GetArray("text");
@@ -2854,7 +2863,7 @@ namespace EE_CM
 				for (int i = 0; i < texts.Count; i++) {
 					modText[i] = texts.GetString(i);
 				}
-				#endregion
+#endregion
 
 				if (o.Contains("worlddata")) {
 					readWorldData(ref o, !init);
@@ -2873,10 +2882,10 @@ namespace EE_CM
 				W_gotEdited = false;
 			});
 		}
-		#endregion
+#endregion
 		void getWorldDataMessage(ref Message m)
 		{
-			#region Fore-/background and special blocks
+#region Fore-/background and special blocks
 			for (int l = 0; l < (int)C.BLOCK_TYPES; l++)
 				for (int b = 0; b < (int)C.BLOCK_MAX; b++) {
 					if (l == 0 && b == 0)
@@ -2924,9 +2933,9 @@ namespace EE_CM
 						m.Add(real_block, 0, bufferX, bufferY, (modText[b] != null ? modText[b] : "INTERNAL ERROR"));
 					} else m.Add(real_block, 0, bufferX, bufferY, b);
 				}
-			#endregion
+#endregion
 
-			#region Portals
+#region Portals
 			for (int r = 0; r < PBlock.GetLength(0); r++)
 				for (int g = 0; g < 100; g++)
 					for (int p = 0; p < 100; p++) {
@@ -2957,7 +2966,7 @@ namespace EE_CM
 
 						m.Add(242, 0, bufferX, bufferY, r, g, p);
 					}
-			#endregion
+#endregion
 		}
 
 		void Cleanup_Timer()
@@ -2967,7 +2976,7 @@ namespace EE_CM
 			if (modText == null)
 				return;
 
-			#region Remove unused text from the array
+#region Remove unused text from the array
 			int b = BlockToSPId(1000);
 			if (Nblock[b, 0] == null)
 				return;
@@ -2986,7 +2995,7 @@ namespace EE_CM
 				if (!is_used[i] && modText[i] != null)
 					modText[i] = null;
 			}
-			#endregion
+#endregion
 		}
 
 		void initPlayers()
@@ -3067,7 +3076,7 @@ namespace EE_CM
 					}
 				}
 
-				#region Misc
+#region Misc
 				foreach (Player p in Players) {
 					if (p.Id != pl.Id) {
 						pl.Send("add", p.Id, p.Name, 
@@ -3089,7 +3098,7 @@ namespace EE_CM
 
 				if (W_crown != -1)
 					pl.Send("k", W_crown);
-				#endregion
+#endregion
 				pl.send_init = false;
 				pl.isInited = true;
 			}
@@ -3110,7 +3119,7 @@ namespace EE_CM
 				if (!pl.isDead) continue;
 				pl.isDead = false;
 				if (pl.god_mode || pl.mod_mode) continue;
-				#region dead
+#region dead
 				COOR c = new COOR();
 
 				if (getBlock(0, pl.cPointX, pl.cPointY) == 104) {
@@ -3130,7 +3139,7 @@ namespace EE_CM
 				pl.posY = c.y * 16;
 
 				msg.Add(pl.Id, pl.posX, pl.posY);
-				#endregion
+#endregion
 				count++;
 			}
 			if (count > 0) Broadcast(msg);
@@ -3415,7 +3424,7 @@ namespace EE_CM
 			char[] raw_1 = text_1.ToLower().ToCharArray(),
 					raw_2 = text_2.ToLower().ToCharArray();
 
-			#region normalize
+#region normalize
 			for (int i = 0; i < raw_1.Length; i++) {
 				char cur = raw_1[i];
 				bool found = false;
@@ -3438,7 +3447,7 @@ namespace EE_CM
 				}
 				if (!found) raw_2[i] = '.';
 			}
-			#endregion
+#endregion
 
 			int equals = 0,
 				total = 0;
