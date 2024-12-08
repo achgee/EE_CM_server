@@ -68,7 +68,8 @@ namespace EE_CM
 					levelComplete = false,
 					gotCoin = false,
 					getBlockInfo = false,
-					wootGiven = false;
+					wootGiven = false,
+					disabledWarnings = false;
 	}
 
 	public class LobbyPlayer : BasePlayer

@@ -24,6 +24,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using PlayerIO.GameLibrary;
 
 namespace EE_CM
@@ -42,7 +44,8 @@ namespace EE_CM
 		WORLDS_PER_PLAYER = 4,
 		SMILIES = 66,
 		AWAY_SMILEY = 65,
-		DIAMOND_SMILEY = 31
+		DIAMOND_SMILEY = 31,
+		EXPERIMENTAL_SAVE_SPLIT_POINT = 480000
 	}
 
 	enum Rights
@@ -59,7 +62,7 @@ namespace EE_CM
 #if INDEV
 	[RoomType("Indev")]
 #else
-	[RoomType("Game40")]
+	[RoomType("Game41")]
 #endif
 	public class EENGameCode : Game<Player>
 	{
@@ -94,6 +97,7 @@ namespace EE_CM
 			W_resized = false,
 			W_can_save = false,
 			W_experimental_saving = false,
+			W_verbose = false,
 			W_canRespawn = true;
 
 		int W_width, W_height, W_plays,
@@ -104,7 +108,9 @@ namespace EE_CM
 			cSpawn = 0,
 			W_type = -1,
 			sys_msg_max = 3,
-			W_broadcast_level = 0;
+			W_broadcast_level = 0,
+			W_chunks = 0,
+			W_loaded_chunks = 0;
 
 		string W_key = "",
 			W_rot13,
@@ -114,6 +120,7 @@ namespace EE_CM
 			say_normal = "abcdefghijklmnopqurstuvwxyz ";
 
 		byte[] keys = new byte[3];
+		byte[][] W_bytes;
 #endregion
 
 		public override void GameStarted()
@@ -636,7 +643,8 @@ namespace EE_CM
 						if (b >= 306 && b <= 310) edit = true;  // Cave (by Weirdo)
 						if (b >= 311 && b <= 313) edit = true;  // Dungeon (by dcomet)
 						if (b >= 314 && b <= 320) edit = true;  // Urban (by dcomet)
-						if (b == 321) edit = true;				// Extra Glass (by HG)
+						if (b == 321) edit = true;              // Extra Glass
+						if (b == 322 || b == 323) edit = true;	// New hazard and liquid
 
 						if (!edit)
 							return;
@@ -1685,8 +1693,15 @@ namespace EE_CM
 								p.Disconnect();
 							}
 						}
-						RoomData["name"] = "shit";
+						RoomData["name"] = "lobbyinvis";
 						RoomData.Save();
+						return;
+					}
+
+					if (args[0] == "/ac") {
+						if (!hasAccess(pl, Rights.Moderator)) return;
+						pl.disabledWarnings = !pl.disabledWarnings;
+						pl.Send("write", SYS, "Anti-cheat warnings: " + (pl.disabledWarnings ? "OFF" : "ON"));
 						return;
 					}
 
@@ -1873,6 +1888,12 @@ namespace EE_CM
 								return;
 
 							set_setting(pl, newValue, ref W_experimental_saving, "Experimental DB saving");
+							break;
+						case "verbose":
+							if (!hasAccess(pl, Rights.Owner))
+								return;
+
+							set_setting(pl, newValue, ref W_verbose, "Verbose");
 							break;
 						default:
 							pl.Send("write", SYS, "Unknown setting `" + args[1].ToLower() + "´. See `help all´");
@@ -2116,7 +2137,7 @@ namespace EE_CM
 						pl.Disconnect();
 						return;
 					}
-					else
+					else if (!pl.disabledWarnings)
 						pl.Send("write", "* Warning", "mWarns threshold exceeded. Current: " + pl.mWarns);
 				} else if (pl.mWarns > -10) {
 					pl.mWarns--;
@@ -2158,6 +2179,9 @@ namespace EE_CM
 									gY = (pl.keyY == -1) ? -2 : 0;
 									dir = 0;
 									is_liquid = true;
+								} else if (bl == 323) {
+									valid = true;
+									// Temporary workaround till anti cheat can be understood
 								}
 								break;
 							}
@@ -2430,6 +2454,13 @@ namespace EE_CM
 
 		void deserializeData(byte[] data)
 		{
+			if (W_loaded_chunks < W_chunks)
+				return;
+
+			for (int i = 0; i < W_bytes.Length; i++) {
+				data.Concat(W_bytes[i]);
+			}
+
 #region Define variables
 			MemoryStream stream = new MemoryStream(data);
 			BinaryReader reader = new BinaryReader(stream);
@@ -2748,14 +2779,24 @@ namespace EE_CM
 				Broadcast(M_init);
 		}
 
+		void save_chunk(Player pl, ref byte[] bytes, int chunk) {
+			byte[] b = bytes;
+			PlayerIO.BigDB.LoadOrCreate("Worlds", "Chunk" + chunk + "_" + RoomId, delegate (DatabaseObject o2) {
+				byte[] a = b.Skip(chunk * (int)C.EXPERIMENTAL_SAVE_SPLIT_POINT).Take((int)C.EXPERIMENTAL_SAVE_SPLIT_POINT).ToArray();
+				if (W_verbose)
+					pl.Send("write", SYS, "bytes.Skip(" + (chunk * (int)C.EXPERIMENTAL_SAVE_SPLIT_POINT) + ").Take(" + (int)C.EXPERIMENTAL_SAVE_SPLIT_POINT + ").ToArray().Length = " + a.Length);
+				o2.Set("worlddata2", a);
+				o2.Save(() => pl.Send("write", SYS, "Chunk #" + chunk + " saved successfully"), (PlayerIOError error) => { pl.Send("write", SYS, "Could not save chunk #" + chunk + ". Details: " + error.Message); });
+			});
+		}
+
 #if INDEV
 		void save_worlddata(Player pl, bool kick_all = false) {
 			pl.Send("write", "* ERROR", "You can not save a world in the indev mode.");
 			pl.Send("saved");
 		}
 #else
-		void save_worlddata(Player pl, bool kick_all = false)
-		{
+		void save_worlddata(Player pl, bool kick_all = false) {
 			if (!W_isSaved)
 				return;
 
@@ -2775,20 +2816,32 @@ namespace EE_CM
 					o.Remove("text");
 				if (txt.Count > 0 && !W_experimental_saving)
 					o.Set("text", txt);
-#endregion
+				#endregion
 
 				if (W_experimental_saving) {
 					if (o.Contains("worlddata"))
 						o.Remove("worlddata");
 
-					o.Set("worlddata2", serializeData());
+					byte[] bytes = serializeData();
+					int chunks = 0;
+
+					if (W_verbose)
+						pl.Send("write", SYS, "serializeData().Length = " + bytes.Length);
+
+					for (int i = (int)C.EXPERIMENTAL_SAVE_SPLIT_POINT; i < bytes.Length; i += (int)C.EXPERIMENTAL_SAVE_SPLIT_POINT) {
+						chunks++;
+						save_chunk(pl, ref bytes, chunks);
+					}
+
+					o.Set("worlddata2", bytes.Take((int) C.EXPERIMENTAL_SAVE_SPLIT_POINT).ToArray());
+					o.Set("chunks", chunks);
 				} else {
 					if (o.Contains("worlddata2"))
 						o.Remove("worlddata2");
 
 					saveWorldData(ref o); // Regular way
 				}
-				o.Save();
+				o.Save(null, (PlayerIOError error) => { kick_all = false; pl.Send("write", SYS, "Could not save world. Details: " + error.Message); });
 
 				pl.Send("saved");
 				W_isLoading = false;
@@ -2806,6 +2859,7 @@ namespace EE_CM
 			});
 		}
 #endif
+
 		void load_worlddata(bool respawn = false, bool init = false)
 		{
 			W_isLoading = true;
@@ -2850,8 +2904,11 @@ namespace EE_CM
 						RoomData.Save();
 					});
 				}
-#endregion
+				#endregion
 
+				W_chunks = o.GetInt("chunks", 0);
+				W_loaded_chunks = 0;
+				W_bytes = new byte[W_chunks][];
 				clear_world(false, false);
 
 #region Get texts
@@ -2871,7 +2928,17 @@ namespace EE_CM
 					if (respawn)
 						respawn_players(true);
 				} else if (o.Contains("worlddata2")) {
-					deserializeData(o.GetBytes("worlddata2"));
+					byte[] bytes = o.GetBytes("worlddata2");
+
+					for (int i = 0; i < W_chunks; i++) {
+						PlayerIO.BigDB.Load("Worlds", "Chunk" + (i + 1) + "_" + RoomId, delegate (DatabaseObject o2) {
+							W_bytes[int.Parse(o2.Key.Split('_')[0].Substring(5)) - 1] = o2.GetBytes("worlddata2");
+							W_loaded_chunks++;
+							deserializeData(bytes);
+						});
+					}
+
+					deserializeData(bytes);
 
 					if (!init)
 						W_broadcast_level = respawn ? 2 : 1;
